@@ -90,8 +90,20 @@ async def handle_day_selection(update: Update, context: CallbackContext):
     }
     logger.warning("[handle_day_selection] sending => %r", payload)
     try:
-        data_json = get_available_minutes(payload)
-        logger.warning("[handle_day_selection] got => %r", data_json)
+        # data_json = get_available_minutes(payload)
+        # logger.warning("[handle_day_selection] got => %r", data_json)
+        # logger.info("GETTING AVAILABLE MINUTES")
+        # logger.info(payload)
+        # response = get_available_minutes(payload)
+        # logger.info("RESPONSE STARTING")
+        # logger.info(response)
+        # logger.info("RESPONSE END PRINTING")
+        # data_json = response.json()
+        # avail = data_json.get("available_minutes", {})
+
+        response = get_available_minutes(payload)  # это requests.Response
+        data_json = response.json()                # теперь парсим JSON
+        avail = data_json.get("available_minutes", {})
     except Exception as e:
         logger.error("Error get_available_minutes: %s", e)
         await query.message.reply_text("Ошибка сервера.")
@@ -158,7 +170,8 @@ async def handle_hour_selection(update: Update, context: CallbackContext):
     }
     logger.warning("[handle_hour_selection] => %r", payload)
     try:
-        data_json = get_available_minutes(payload)
+        response = get_available_minutes(payload)  # это requests.Response
+        data_json = response.json() 
         logger.warning("[handle_hour_selection] got => %r", data_json)
     except Exception as e:
         logger.error("Error get_avail_minutes hour: %s", e)
