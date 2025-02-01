@@ -3,9 +3,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import CallbackContext
 from utils.session import get_session
 from utils.localization import SHORT_DAYS
-from states import (
-    CHOOSING_SERVICES, CHOOSING_DATE, CHOOSING_HOUR, CHOOSING_MINUTES, CONFIRM_BOOKING
-)
+from states import CHOOSING_SERVICES, CHOOSING_DATE, CHOOSING_HOUR, CHOOSING_MINUTES, CONFIRM_BOOKING
 from datetime import datetime, timedelta
 from utils.api import get_available_minutes
 import calendar
@@ -20,7 +18,7 @@ def build_grid(buttons, row_size=3):
 
 async def choose_day(update: Update, context: CallbackContext):
     """
-    Список дат + кнопка "Изменить услуги"
+    Показывает список дат и кнопку "Изменить услуги"
     """
     user_id = update.effective_user.id
     session = get_session(user_id)
@@ -32,15 +30,12 @@ async def choose_day(update: Update, context: CallbackContext):
 
     reservDays = session.get("reservDays", 7)
     now = datetime.now()
-    dates = []
-    for i in range(reservDays):
-        d = now + timedelta(days=i)
-        dates.append(d)
+    dates = [now + timedelta(days=i) for i in range(reservDays)]
 
-    dayNames = SHORT_DAYS["ru"]  # or use user language
+    dayNames = SHORT_DAYS["ru"]
     buttons = []
     for d in dates:
-        wday = d.weekday()  # 0..6
+        wday = d.weekday()
         day_abbr = dayNames[wday]
         ddmm = d.strftime("%d.%m")
         iso = d.strftime("%Y-%m-%d")
@@ -49,9 +44,8 @@ async def choose_day(update: Update, context: CallbackContext):
         buttons.append(InlineKeyboardButton(text, callback_data=cb))
 
     kb = build_grid(buttons, row_size=3)
-    # last row: [Изменить услуги]
+    # Добавляем фиксированную строку
     kb.append([InlineKeyboardButton("Изменить услуги", callback_data="change_services")])
-
     await update.effective_message.reply_text(
         "Выберите день:",
         reply_markup=InlineKeyboardMarkup(kb)
@@ -74,13 +68,22 @@ async def handle_day_selection(update: Update, context: CallbackContext):
         await query.message.reply_text("Invalid day format.")
         return CHOOSING_DATE
 
-    chosen_date = data.split("_")[1]
+    chosen_date = data.split("_", 1)[1]
     session["chosen_date"] = chosen_date
 
+    # После выбора дня показываем часы
+    return await show_hours(update, context, chosen_date)
+
+async def show_hours(update: Update, context: CallbackContext, chosen_date: str):
+    """
+    Вычисляет доступные часы для выбранного дня и выводит их.
+    """
+    user_id = update.callback_query.from_user.id
+    session = get_session(user_id)
     booking_details = session.get("booking_details", [])
     total_duration = sum(cat.get("duration", 0) for cat in booking_details) or 30
 
-    hours_list = list(range(9,23))
+    hours_list = list(range(9, 23))
     payload = {
         "salon_id": session["salon_id"],
         "date": chosen_date,
@@ -88,35 +91,19 @@ async def handle_day_selection(update: Update, context: CallbackContext):
         "booking_details": booking_details,
         "total_service_duration": total_duration
     }
-    logger.warning("[handle_day_selection] sending => %r", payload)
+    logger.warning("[show_hours] sending => %r", payload)
     try:
-        # data_json = get_available_minutes(payload)
-        # logger.warning("[handle_day_selection] got => %r", data_json)
-        # logger.info("GETTING AVAILABLE MINUTES")
-        # logger.info(payload)
-        # response = get_available_minutes(payload)
-        # logger.info("RESPONSE STARTING")
-        # logger.info(response)
-        # logger.info("RESPONSE END PRINTING")
-        # data_json = response.json()
-        # avail = data_json.get("available_minutes", {})
-
-        response = get_available_minutes(payload)  # это requests.Response
-        data_json = response.json()                # теперь парсим JSON
+        response = get_available_minutes(payload)
+        data_json = response.json()
         avail = data_json.get("available_minutes", {})
     except Exception as e:
         logger.error("Error get_available_minutes: %s", e)
-        await query.message.reply_text("Ошибка сервера.")
+        await update.callback_query.message.reply_text("Ошибка сервера.")
         return CHOOSING_DATE
 
-    avail = data_json.get("available_minutes", {})
-    valid_hours = []
-    for h in hours_list:
-        if avail.get(str(h)):
-            valid_hours.append(h)
-
+    valid_hours = [h for h in hours_list if avail.get(str(h))]
     if not valid_hours:
-        await query.message.reply_text("Нет доступных часов для этого дня.")
+        await update.callback_query.message.reply_text("Нет доступных часов для этого дня.")
         return CHOOSING_DATE
 
     hour_buttons = []
@@ -125,12 +112,14 @@ async def handle_day_selection(update: Update, context: CallbackContext):
         txt = f"≈ {h}:00"
         hour_buttons.append(InlineKeyboardButton(txt, callback_data=cb))
 
-    # final row: [Изменить день, Изменить услуги]
-    hour_buttons.append(InlineKeyboardButton("Изменить день", callback_data="change_day"))
-    hour_buttons.append(InlineKeyboardButton("Изменить услуги", callback_data="change_services"))
-
     kb = build_grid(hour_buttons, row_size=2)
-    await query.message.reply_text(
+    # Фиксированная строка с кнопками
+    kb.append([
+        InlineKeyboardButton("Изменить день", callback_data="change_day"),
+        InlineKeyboardButton("Изменить услуги", callback_data="change_services")
+    ])
+
+    await update.callback_query.message.reply_text(
         f"Вы выбрали день {chosen_date}. Выберите примерный час:",
         reply_markup=InlineKeyboardMarkup(kb)
     )
@@ -154,12 +143,12 @@ async def handle_hour_selection(update: Update, context: CallbackContext):
         await query.message.reply_text("Некорректный выбор часа.")
         return CHOOSING_HOUR
 
-    chosen_hour = data.split("_")[1]
+    chosen_hour = data.split("_", 1)[1]
     session["chosen_hour"] = chosen_hour
-    chosen_date = session.get("chosen_date","")
+    chosen_date = session.get("chosen_date", "")
 
     booking_details = session.get("booking_details", [])
-    total_duration = sum(cat.get("duration",0) for cat in booking_details) or 30
+    total_duration = sum(cat.get("duration", 0) for cat in booking_details) or 30
 
     payload = {
         "salon_id": session["salon_id"],
@@ -170,8 +159,8 @@ async def handle_hour_selection(update: Update, context: CallbackContext):
     }
     logger.warning("[handle_hour_selection] => %r", payload)
     try:
-        response = get_available_minutes(payload)  # это requests.Response
-        data_json = response.json() 
+        response = get_available_minutes(payload)
+        data_json = response.json()
         logger.warning("[handle_hour_selection] got => %r", data_json)
     except Exception as e:
         logger.error("Error get_avail_minutes hour: %s", e)
@@ -180,31 +169,31 @@ async def handle_hour_selection(update: Update, context: CallbackContext):
 
     avail = data_json.get("available_minutes", {})
     minute_list = avail.get(str(chosen_hour), [])
-
     if not minute_list:
         await query.message.reply_text("Нет доступных минут для этого часа.")
         return CHOOSING_HOUR
 
-    # build minute buttons
     minute_buttons = []
     for m in minute_list:
         m_int = int(m)
         end_m = m_int + total_duration
         end_h = int(chosen_hour)
-        if end_m>=60:
-            end_h += end_m//60
-            end_m = end_m%60
+        if end_m >= 60:
+            end_h += end_m // 60
+            end_m = end_m % 60
         start_str = f"{chosen_hour}:{m_int:02d}"
         end_str = f"{end_h}:{end_m:02d}"
         txt = f"{start_str}-{end_str}"
         cb = f"min_{chosen_hour}:{m_int:02d}"
         minute_buttons.append(InlineKeyboardButton(txt, callback_data=cb))
 
-    # final row: [Изменить час, Изменить услуги]
-    minute_buttons.append(InlineKeyboardButton("Изменить час", callback_data="change_hour"))
-    minute_buttons.append(InlineKeyboardButton("Изменить услуги", callback_data="change_services"))
-
+    # Строим сетку для минут и добавляем фиксированную строку
     kb = build_grid(minute_buttons, row_size=2)
+    kb.append([
+        InlineKeyboardButton("Изменить час", callback_data="change_hour"),
+        InlineKeyboardButton("Изменить услуги", callback_data="change_services")
+    ])
+
     await query.message.reply_text(
         f"Вы выбрали час {chosen_hour}:00. Выберите точное время:",
         reply_markup=InlineKeyboardMarkup(kb)
@@ -219,10 +208,10 @@ async def handle_minute_selection(update: Update, context: CallbackContext):
     user_id = query.from_user.id
     session = get_session(user_id)
 
-    # Кнопки "Изменить час" / "Изменить услуги"
     if data == "change_hour":
-        # Возвращаемся к выбору часа
-        return await handle_day_selection(update, context)
+        # Вместо попытки изменить update.callback_query.data, просто вызываем show_hours
+        chosen_date = session.get("chosen_date", "")
+        return await show_hours(update, context, chosen_date)
     if data == "change_services":
         from handlers.services import choose_services
         return await choose_services(update, context)
@@ -231,65 +220,42 @@ async def handle_minute_selection(update: Update, context: CallbackContext):
         await query.message.reply_text("Некорректный формат минут.")
         return CHOOSING_MINUTES
 
-    # Пример: data="min_14:20"
+    # Пример: data = "min_14:20"
     hm_str = data.split("_", 1)[1]  # "14:20"
     session["chosen_time"] = hm_str
 
-    # Получаем дату, время
-    chosen_date = session.get("chosen_date", "")  # "2025-01-30"
-    # Парсим дату, чтобы показать "30 января"
+    # Форматируем дату для вывода (например, "30 января")
+    chosen_date = session.get("chosen_date", "")
     try:
         dt_obj = datetime.strptime(chosen_date, "%Y-%m-%d")
         day_num = dt_obj.day
         month_num = dt_obj.month
-        # Название месяца по-русски (или возьмите словарь). Можно и calendar:
-        month_name = calendar.month_name[month_num]  # "January" по-английски
-        # Или свой словарь:
         ru_months = [
-            "января","февраля","марта","апреля","мая","июня",
-            "июля","августа","сентября","октября","ноября","декабря"
+            "января", "февраля", "марта", "апреля", "мая", "июня",
+            "июля", "августа", "сентября", "октября", "ноября", "декабря"
         ]
-        month_name_ru = ru_months[month_num-1]
+        month_name_ru = ru_months[month_num - 1]
         date_str = f"{day_num} {month_name_ru}"
     except ValueError:
-        # На случай ошибки
         date_str = chosen_date
 
-    # Время вместо "14:20" -> "14։20"
     time_str = hm_str.replace(":", "։")
-
-    # Смотрим выбранного мастера (если есть)
     barber = session.get("chosen_barber")
     barber_name = barber["name"] if barber else "—"
 
-    # Список выбранных услуг
-    chosen_services = session.get("chosen_services", [])  # список ID в виде str
-    services_list = session.get("services_list", [])      # полный список словарей
-    # соберём названия
-    chosen_names = []
-    for svc in services_list:
-        sid_str = str(svc["id"])
-        if sid_str in chosen_services:
-            chosen_names.append(svc["name"])
+    chosen_services = session.get("chosen_services", [])
+    services_list = session.get("services_list", [])
+    chosen_names = [svc["name"] for svc in services_list if str(svc["id"]) in chosen_services]
+    services_str = ", ".join(chosen_names) if chosen_names else "не выбраны"
 
-    # Или если у вас уже booking_details собран, можно извлечь названия оттуда.
-    # Но чаще удобнее здесь: chosen_names = ...
-    if chosen_names:
-        services_str = ", ".join(chosen_names)
-    else:
-        services_str = "не выбраны"
-
-    # Формируем текст
     text = (
         f"Вы выбрали: {date_str} {time_str}\n"
         f"Мастер: {barber_name}\n"
-        f"Услуги: {services_str}\n"
-        "Нажмите 'Подтвердить' или 'Отменить'."
+        f"Услуги: {services_str}"
     )
 
     await query.message.reply_text(text)
 
-    # Кнопки "Подтвердить"/"Отменить"
     kb = [
         [
             InlineKeyboardButton("Подтвердить", callback_data="confirm_booking"),

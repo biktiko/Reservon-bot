@@ -43,10 +43,18 @@ async def confirm_booking_logic(session, message):
     h, m = chosen_time.split(":")
     startH = int(h)
     startM = int(m)
-    end_min_total = startH*60 + startM + total_dur
+    end_min_total = startH * 60 + startM + total_dur
     endH = end_min_total // 60
     endM = end_min_total % 60
     endTime_str = f"{endH:02d}:{endM:02d}"
+
+    def normalize_phone(phone: str) -> str:
+        phone = phone.strip()
+        if not phone.startswith("+"):
+            phone = "+" + phone
+        return phone
+
+    normalized_phone = normalize_phone(session["phone_number"])
 
     payload = {
         "salon_id": salon_id,
@@ -57,11 +65,11 @@ async def confirm_booking_logic(session, message):
         "endTime": endTime_str,
         "user_comment": "",
         "salonMod": "category",
-        "phone_number": session["phone_number"], 
+        "phone_number": normalized_phone,
     }
 
     logger.warning("[confirm_booking_logic] => %r", payload)
-
+    
     url = f"https://reservon.am/api/salons/{salon_id}/book/"
     try:
         resp = requests.post(url, json=payload)
@@ -76,9 +84,15 @@ async def confirm_booking_logic(session, message):
     except Exception as e:
         logger.error("Exception in confirm_booking_logic: %s", e)
         await message.reply_text("Ошибка при запросе бронирования.")
-        
+
 async def cancel_booking(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
     await query.message.reply_text("Вы отменили бронирование.")
     return CONFIRM_BOOKING
+
+def normalize_phone(phone: str) -> str:
+    phone = phone.strip()
+    if not phone.startswith("+"):
+        phone = "+" + phone
+    return phone

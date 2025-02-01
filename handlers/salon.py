@@ -4,7 +4,7 @@ from telegram.ext import CallbackContext
 from utils.api import get_salons, get_salon_details
 from utils.localization import get_texts
 from utils.session import set_user_language, get_user_language, get_session
-
+from handlers.barbers import choose_barbers
 from PIL import Image
 import requests
 from io import BytesIO
@@ -34,8 +34,6 @@ async def ask_for_salon(update, context: CallbackContext):
     return CHOOSING_SALON
 
 async def choose_salon_callback(update, context: CallbackContext):
-
-    # Сохранение текущего состояния
     context.user_data['current_state'] = CHOOSING_SALON
 
     query = update.callback_query
@@ -46,39 +44,26 @@ async def choose_salon_callback(update, context: CallbackContext):
 
     if data.startswith("salon_"):
         salons_data = get_salons()
-
         salon_id = data.split("_")[1]
+        salon = next((s for s in salons_data if str(s["id"]) == salon_id), None)
+        if not salon:
+            await query.answer("Салон не найден", show_alert=True)
+            return
 
-        salon = next((salon for salon in salons_data if str(salon["id"]) == salon_id), None)
         salon_name = salon["name"]
-
         session = get_session(user_id)
-        session["salon_id"] = salon_id
+        session["salon_id"] = salon_id  # Записываем в сессию
 
         await query.answer(texts["salon_chosen"] + salon_name, show_alert=False)
         await query.edit_message_text(texts["salon_chosen"] + salon_name)
 
-        # Получение мастеров для выбранного салона
-        data = get_salon_details(salon_id)
-        barbers = data["barbers"]
-        session["barbers_list"] = barbers
+        # Теперь вместо цикла — просто получите barbers, сохраните их в сессии (если нужно),
+        # и вызывайте вашу новую функцию:
+        barbers_data = get_salon_details(salon_id).get("barbers", [])
+        session["barbers_list"] = barbers_data
 
-        # Отправляем каждого мастера с кнопкой выбора
-        for barber in barbers:
-            compressed_image = compress_image(barber["avatar"])
-
-            # Отправляем сжатое изображение мастера
-            await query.message.reply_photo(
-                photo=compressed_image,
-                caption=f"<b>{barber['name']}</b>\n{barber['description']}",
-                parse_mode="HTML",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton(text=f"Выбрать {barber['name']}", callback_data=f"barber_{barber['id']}")]
-                ])
-            )
-
-        # Возвращаем состояние выбора мастера
-        return CHOOSING_BARBERS
+        # Переходим к выбору барберов через handlers/barbers.py
+        return await choose_barbers(update, context)
 
 
 def compress_image(image_url, size=(128, 128)):

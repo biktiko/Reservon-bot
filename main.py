@@ -15,14 +15,14 @@ from handlers.language import handle_language_command, handle_language_selection
 from handlers.salon import ask_for_salon, choose_salon_callback
 from handlers.options import show_main_menu, main_options_callback
 from handlers.services import choose_services, handle_service_selection
-from handlers.barbers import handle_barber_selection
+from handlers.barbers import handle_barber_selection, handle_change_barber
 from handlers.datetime_handler import (
     handle_day_selection,
     handle_hour_selection,
     handle_minute_selection,
 )
 from handlers.booking_handler import confirm_booking, cancel_booking
-from handlers.phone import ask_telegram_phone, handle_telegram_phone
+from handlers.phone import handle_telegram_phone
 
 from states import (
     CHOOSING_LANGUAGE,
@@ -72,9 +72,9 @@ def main():
                 CallbackQueryHandler(handle_barber_selection, pattern="^barber_.*")
             ],
             CHOOSING_SERVICES: [
-                # Позволяет запустить /services
                 CommandHandler("services", choose_services),
-                CallbackQueryHandler(handle_service_selection, pattern="^(svc_\\d+|services_done)$")
+                CallbackQueryHandler(handle_service_selection, pattern="^(svc_\\d+|services_done)$"),
+                CallbackQueryHandler(handle_change_barber, pattern="^change_barber$")
             ],
             CHOOSING_DATE: [
                 CallbackQueryHandler(
