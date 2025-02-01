@@ -249,7 +249,7 @@ async def handle_minute_selection(update: Update, context: CallbackContext):
     services_str = ", ".join(chosen_names) if chosen_names else "не выбраны"
 
     text = (
-        f"Вы выбрали: {date_str} {time_str}\n"
+        f"Вы выбрали: {date_str} {time_str}\n\n"
         f"Мастер: {barber_name}\n"
         f"Услуги: {services_str}"
     )
