@@ -107,19 +107,19 @@ async def handle_service_selection(update: Update, context: CallbackContext):
     chosen_ids = session.get("chosen_services", [])
 
     if data == "services_done":
-        if chosen_ids:
-            from utils.functions import parse_duration_to_minutes
+        from utils.functions import parse_duration_to_minutes
 
+        # Если выбраны услуги, формируем booking_details на их основе
+        if chosen_ids:
             sum_duration = 0
             service_objects = []
             chosen_names = []
-            # Инициализируем category_id, на случай если будет задана только в цикле
-            category_id = None
+            category_id = None  # Если услуги из одной категории
 
             for svc in services:
                 sid_str = str(svc["id"])
                 if sid_str in chosen_ids:
-                    # Запоминаем категорию (перезапишется, если несколько услуг)
+                    # Запоминаем категорию (если услуг несколько, будет последняя, но обычно услуги из одной категории)
                     category_id = svc.get("category")
                     chosen_names.append(svc["name"])
                     dur_minutes = parse_duration_to_minutes(svc.get("duration"))
@@ -130,17 +130,12 @@ async def handle_service_selection(update: Update, context: CallbackContext):
                         "categoryId": category_id
                     })
 
-            # Если все услуги одной категории, нет проблем.
-            # Но если пользователь мог выбрать услуги из разных категорий,
-            # у Вас будет только последняя. Либо нужно иной подход.
-
             booking_details = [{
                 "categoryId": category_id,
                 "services": service_objects,
-                "barberId":  session["chosen_barber"]["id"],
+                "barberId": session["chosen_barber"]["id"],
                 "duration": sum_duration
             }]
-
             session["booking_details"] = booking_details
             session["total_service_duration"] = sum_duration
 
@@ -151,12 +146,30 @@ async def handle_service_selection(update: Update, context: CallbackContext):
             else:
                 await query.message.reply_text("Вы ничего не выбрали (неизв. ошибка).")
         else:
-            # Ничего не выбрано
-            session["booking_details"] = []
-            session["total_service_duration"] = 30
-            await query.message.reply_text("Вы не выбрали ни одной услуги")
+            # Если услуги не выбраны, но, возможно, выбран мастер
+            if "chosen_barber" in session and session["chosen_barber"]:
+                # Используем дефолтную длительность для бронирования.
+                # Здесь можно использовать значение из настроек салона или задать фиксированное значение, например, 30 минут.
+                default_duration = session.get("salon_default_duration", 30)
+                booking_details = [{
+                    "categoryId": None,       # Услуги не выбраны, поэтому категория отсутствует
+                    "services": [],
+                    "barberId": session["chosen_barber"]["id"],
+                    "duration": default_duration
+                }]
+                session["booking_details"] = booking_details
+                session["total_service_duration"] = default_duration
+                await query.message.reply_text(
+                    f"Вы не выбрали услуги, но выбран мастер {session['chosen_barber']['name']}. "
+                    f"Бронирование будет оформлено с длительностью по умолчанию ~{default_duration} мин."
+                )
+            else:
+                # Если и мастер не выбран (маловероятно), просто устанавливаем дефолт
+                session["booking_details"] = []
+                session["total_service_duration"] = 30
+                await query.message.reply_text("Вы не выбрали ни одной услуги.")
 
-        # Идём к дате
+        # Переходим к выбору даты
         from handlers.datetime_handler import choose_day
         return await choose_day(update, context)
 
@@ -175,3 +188,4 @@ async def handle_service_selection(update: Update, context: CallbackContext):
     else:
         await query.answer("Неизвестная команда")
         return CHOOSING_SERVICES
+
