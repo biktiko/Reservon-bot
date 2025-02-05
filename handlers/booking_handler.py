@@ -10,18 +10,24 @@ logger = logging.getLogger(__name__)
 async def confirm_booking(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()
-
     user_id = update.effective_user.id
     session = get_session(user_id)
-
-    # Если телефон ещё не получен => спросим
+    
+    # Если данные содержат выбранное время (начинается с "confirm_")
+    callback_data = query.data  # например, "confirm_10:00"
+    if callback_data.startswith("confirm_"):
+        chosen_time = callback_data.split("_", 1)[1]
+        session["chosen_time"] = chosen_time  # сохраняем выбранное время в сессии
+    
+    # Если телефон ещё не получен, попросим его
     if "phone_number" not in session:
         from handlers.phone import ask_telegram_phone
         return await ask_telegram_phone(update, context)
-
-    # Иначе телефон есть => оформляем
+    
+    # Переходим к логике подтверждения бронирования
     await confirm_booking_logic(session, query.message)
     return CONFIRM_BOOKING
+
 
 async def confirm_booking_logic(session, message):
     """

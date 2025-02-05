@@ -82,7 +82,7 @@ async def choose_barbers(update: Update, context: CallbackContext):
     
 async def handle_change_barber(update: Update, context: CallbackContext):
     query = update.callback_query
-    await query.answer("Вы меняете мастера")
+    await query.answer("Вы меняете мастера.")
     # Возвращаем пользователя в состояние выбора мастера,
     # вызывая функцию choose_barbers (она уже есть в handlers/barbers.py)
     from handlers.barbers import choose_barbers

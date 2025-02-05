@@ -154,7 +154,7 @@ async def handle_service_selection(update: Update, context: CallbackContext):
             # Ничего не выбрано
             session["booking_details"] = []
             session["total_service_duration"] = 30
-            await query.message.reply_text("Вы не выбрали ни одной услуги. (Будет 30 мин по умолч.)")
+            await query.message.reply_text("Вы не выбрали ни одной услуги")
 
         # Идём к дате
         from handlers.datetime_handler import choose_day

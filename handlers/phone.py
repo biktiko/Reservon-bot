@@ -53,7 +53,7 @@ async def handle_telegram_phone(update: Update, context: CallbackContext):
     # Если нажал "Отмена"
     text = message.text
     if text == "Отмена":
-        await message.reply_text("Вы отменили ввод номера телефона.", reply_markup=ReplyKeyboardRemove())
+        await message.reply_text("Вы отменили бронирование", reply_markup=ReplyKeyboardRemove())
         return CONFIRM_BOOKING
 
     # Иначе просим повторить

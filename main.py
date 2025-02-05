@@ -20,6 +20,8 @@ from handlers.datetime_handler import (
     handle_day_selection,
     handle_hour_selection,
     handle_minute_selection,
+    handle_change_hour,
+    handle_change_services
 )
 from handlers.booking_handler import confirm_booking, cancel_booking
 from handlers.phone import handle_telegram_phone
@@ -95,8 +97,10 @@ def main():
                 )
             ],
             CONFIRM_BOOKING: [
-                CallbackQueryHandler(confirm_booking, pattern="^confirm_booking$"),
-                CallbackQueryHandler(cancel_booking, pattern="^cancel_booking$")
+                CallbackQueryHandler(confirm_booking, pattern="^confirm_.*"),
+                CallbackQueryHandler(cancel_booking, pattern="^cancel_booking$"),
+                CallbackQueryHandler(handle_change_hour, pattern="^change_hour$"),
+                CallbackQueryHandler(handle_change_services, pattern="^change_services$")
             ],
             ASK_TG_PHONE: [
                 MessageHandler(filters.CONTACT | filters.TEXT, handle_telegram_phone)

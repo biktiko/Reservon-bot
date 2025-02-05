@@ -59,8 +59,13 @@ async def choose_salon_callback(update, context: CallbackContext):
 
         # Теперь вместо цикла — просто получите barbers, сохраните их в сессии (если нужно),
         # и вызывайте вашу новую функцию:
-        barbers_data = get_salon_details(salon_id).get("barbers", [])
+        salon_details = get_salon_details(salon_id)
+        barbers_data = salon_details.get("barbers", [])
         session["barbers_list"] = barbers_data
+
+        salon_appointment_mod = salon_details.get("appointment_mod", "handler")
+        session["appointment_mod"] = salon_appointment_mod
+
 
         # Переходим к выбору барберов через handlers/barbers.py
         return await choose_barbers(update, context)
