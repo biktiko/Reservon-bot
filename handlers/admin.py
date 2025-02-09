@@ -275,11 +275,12 @@ async def admin_handle_barber_selection(update: Update, context: ContextTypes.DE
     context.user_data["chosen_barber"] = barber_id
     await query.edit_message_text(
         "Мастер выбран. Теперь отправьте время нового бронирования.\n\n"
+        
         "Примеры команды:\n"
         "11։40-12։00\n"
         "11։40 20 минут или 11։40 20\n"
-        "10։30-10։40 11․02 или 11․02 10։30-11։40'\n"
-        "15․02 10։30 20\n"
+        "10։30-10։40 11․02 или 11․02 10։30-11։40\n"
+        "15․02 10։30 20\n\n"
         "После любой даты можно добавить комментарий։ например 10։30 20 Ashot 097242038",
 
         reply_markup=change_master_button()
