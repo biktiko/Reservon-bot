@@ -11,6 +11,7 @@ from telegram import BotCommand
 import asyncio
 
 from config import TELEGRAM_BOT_TOKEN
+from handlers.admin import get_admin_conv_handler
 from handlers.language import handle_language_command, handle_language_selection
 from handlers.salon import ask_for_salon, choose_salon_callback
 from handlers.options import show_main_menu, main_options_callback
@@ -47,6 +48,7 @@ logger = logging.getLogger(__name__)
 async def set_bot_commands(application):
     commands = [
         BotCommand("start", "Start the bot"),
+        BotCommand("admin", "Админ панель")
         # BotCommand("language", "Change the language"),
     ]
     await application.bot.set_my_commands(commands)
@@ -62,7 +64,12 @@ def main():
     app.add_handler(language_handler)
 
     conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("start", ask_for_salon)],
+
+        entry_points=[
+            CommandHandler("start", ask_for_salon),
+            # CommandHandler("admin", admin_start)
+        ],
+
         states={
             CHOOSING_LANGUAGE: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_language_selection)
@@ -113,6 +120,9 @@ def main():
         per_user=True,
         per_chat=False
     )
+
+    admin_conv_handler = get_admin_conv_handler()
+    app.add_handler(admin_conv_handler)
 
     app.add_handler(conv_handler)
     app.run_polling()
